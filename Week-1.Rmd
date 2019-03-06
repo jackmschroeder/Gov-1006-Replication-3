@@ -2,10 +2,12 @@
 title: 'Replication #3'
 author: "Jack Schroeder"
 date: "3/5/2019"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 ---
-
-```{r setup, include=FALSE, results = 'asis'}
+## Abstract
+```{r setup, include=FALSE, warning=FALSE, results = "asis"}
 knitr::opts_chunk$set(echo = TRUE)
 
 # Tables 1 and 3 and All Figures
@@ -14,6 +16,10 @@ knitr::opts_chunk$set(echo = TRUE)
 # Most of these are already installed, but some (like maps and cem)
 # need to be installed before running the code. Cem requires XQuartz,
 # which I did not have installed.
+
+# Two files - both ending in ind.csv - could not be committed to GitHub due to size. They can be
+# downloaded off the dataverse:
+# https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CAEEG7.
 
 library(foreign)
 library(plyr)
@@ -176,6 +182,313 @@ ns.blacks <- subset(nes.blacks, abs.sample == 1)
 ns.whites$state.abb <- factor(ns.whites$state.abb)
 ns.blacks$state.abb <- factor(ns.blacks$state.abb)
 
+# This is the formula they create for looking at 1860 Census Data.
 
+base1860.form <- formula(. ~ pslave1860 + log(coarea00) + latitude + I(latitude^2) + longitude + I(longitude^2)+ rugged  + land.ineq1860 + sfarmprop1860 + log(totpop1860) + log(fvalpac1860) + log(acimp1860) + fbprop1860  + rail1860 + water1860 + state.abb)
+
+# This looks at individual data.
+
+ind.form <- formula(. ~ pslave1860   + log(coarea00) + latitude + I(latitude^2) + longitude + I(longitude^2) + rugged + land.ineq1860 + sfarmprop1860 + log(totpop1860) + log(fvalpac1860) + log(acimp1860) + fbprop1860 + rail1860 + water1860 + as.factor(educ) +  inc.cat +religion + female + age + state.abb*as.factor(year))
+
+# This looks at individual data including interaction variables.
+
+ind.int.form <- formula(. ~ pslave1860   + log(coarea00) + latitude + I(latitude^2) + longitude + I(longitude^2) + rugged + land.ineq1860 + sfarmprop1860 + log(totpop1860) + log(fvalpac1860) + log(acimp1860) + fbprop1860 + rail1860 + water1860 + as.factor(educ)*pslave1860 + inc.cat*pslave1860 + religion*pslave1860 + female*pslave1860 + age*pslave1860  + state.abb*as.factor(year))
+
+# This data looks at contextual data (county? time? Unclear).
+
+context.form <- formula(. ~ pslave1860   + log(coarea00) + latitude + I(latitude^2) + longitude + I(longitude^2) + rugged + land.ineq1860 + sfarmprop1860 + log(totpop1860) + log(fvalpac1860) + log(acimp1860) + fbprop1860 + rail1860 + water1860 + as.factor(educ) + inc.cat  +religion +female + age + blkprop.z00 + log(medinc.z10) + w.unemp.rate2014 + log(wbincratio2014) + state.abb*as.factor(year))
+
+# This looks at context but with interactions. 
+
+context.int.form <- formula(. ~ pslave1860   + log(coarea00) + latitude + I(latitude^2) + longitude + I(longitude^2) + rugged + land.ineq1860 + sfarmprop1860 + log(totpop1860) + log(fvalpac1860) + log(acimp1860) + fbprop1860 + rail1860 + water1860 + as.factor(educ) +  inc.cat  +religion +female + age + blkprop.z00*pslave1860 + log(medinc.z10)*pslave1860 + w.unemp.rate2014*pslave1860 + log(wbincratio2014)*pslave1860 + state.abb*as.factor(year))
+
+# For instrumental-variable regression (a topic I know little about), they use the Formula
+# packages. I understand this to mean they take a quasi-experimental approach and infer 
+# randomization at some point.
+
+base.iv.form <- Formula(. ~ pslave1860 + log(coarea00) + rugged + latitude + I(latitude^2) + longitude + I(longitude^2)  + water1860  + state.abb | cottonsuit + log(coarea00) + rugged  + latitude + I(latitude^2) + longitude + I(longitude^2) + water1860  + state.abb)
+
+# They return to making normal formulas (this one is a base formula, which is not the reduced
+# form).
+
+base.first.form <- formula(pslave1860 ~ cottonsuit + log(coarea00) + rugged + latitude + I(latitude^2) + longitude + I(longitude^2)  +water1860 + state.abb)
+
+# This one looks at the reduced form check, which is currently just statistical jargon to me.
+
+rform.form <- formula(. ~  cottonsuit + log(coarea00) + rugged + latitude + I(latitude^2)+ longitude + I(longitude^2)  + water1860+  state.abb)
+
+
+
+
+```
+## Figure 2
+```{r fig2, echo=FALSE, results="asis", warning=FALSE}
+
+# Creating Figure 2 involves a lot of code in base R. We essentially take data from southern
+# counties and plot a few things - proportion democrat, affirmative action, 
+# racial resentment, white/black thermometer score - against proportion slave in 1860.
+
+par(mfrow = c(1,4), mar = 0.1 + c(4, 3, 2, 0.5), cex.main = 1)
+plot(south.counties$pslave1860, south.counties$dem, pch = 19, col = "#33333333", xlab = "Proportion Slave, 1860", ylab = "", main = "Proportion Democrat", yaxt = "n", cex = south.counties$sample.size/100)
+axis(side = 2, las = 2)
+abline(lm(dem ~ pslave1860, data = south.counties, weights = sample.size), lwd = 2, col = "#AA0000")
+plot(south.counties$pslave1860, south.counties$affirm, pch = 19, col = "#33333333", xlab = "Proportion Slave, 1860", ylab = "", main = "Affirmative Action", yaxt = "n", cex = south.counties$sample.size/100)
+axis(side = 2, las = 2)
+abline(lm(affirm ~ pslave1860, data = south.counties, weights = sample.size), lwd = 2, col = "#AA0000")
+plot(south.counties$pslave1860, south.counties$resent, pch = 19, col = "#33333333", xlab = "Proportion Slave, 1860", ylab="", main = "Racial Resentment", yaxt = "n", cex = south.counties$sample.size.res/75)
+axis(side = 2, las = 2)
+abline(lm(resent ~ pslave1860, data = south.counties, weights = sample.size.res), lwd = 2, col = "#AA0000")
+with(subset(nes.counties, state.abb %in% st.list), plot(pslave1860, wtherm-btherm, cex = sample.size.bt/40, pch = 19, col = "#33333333", xlab = "Proportion Slave, 1860", ylab = "", main = "White - Black Therm. Score", las = 1, xlim = c(0, 0.9)))
+abline(lm(I(wtherm-btherm) ~ pslave1860, weights = sample.size.bt, data = subset(nes.counties, state.abb %in% st.list)), lwd = 2, col = "#AA0000")
+```
+
+```{r t1, echo=FALSE, results="asis", warning=FALSE}
+library(stargazer)
+# They create the models they analyze. The first looks at
+# proportion democrat and is weighted at the county level.
+
+cnty.res <- lm(dem ~ pslave1860, data = south.counties, weights = sample.size)
+
+# This model is not included in Table 1.
+
+cnty.res.fe <- lm(dem ~ pslave1860 + state.abb, data = south.counties, weights = sample.size)
+
+# The second looks at proportion democrat but includes state
+# fixed effects and 1860 covariates. It uses the base 1860
+# formula.
+
+cnty.res.full <- lm(update(base1860.form, dem ~ .), data = south.counties, weights = sample.size)
+
+# These two models are not in Table 1.
+
+cnty.aff <- lm(affirm ~ pslave1860, data = south.counties, weights = sample.size)
+cnty.aff.fe <- lm(affirm ~ pslave1860 + state.abb, data = south.counties, weights = sample.size)
+
+# This model is the third in Table 1 and analyzes support for
+# affirmative action using the base 1860 formula.
+
+cnty.aff.full <- lm(update(base1860.form, affirm ~ .), data = south.counties, weights = sample.size)
+
+# These two models are not used in Table 1.
+cnty.resent <- lm(resent ~ pslave1860, data = south.counties, weights = sample.size.res)
+cnty.resent.fe <- lm(resent ~ pslave1860 +  state.abb, data = south.counties, weights = sample.size.res)
+
+# This model is the fourth model in the table and analyzes
+# racial resentment using the base 1860 formula. It has
+# clustered standard errors.
+
+cnty.resent.full <- lm(update(base1860.form, resent ~ .), data = south.counties, weights = sample.size.res)
+
+# These models look at individual results, which are necessary
+# for the fifth model in Table 1.
+
+therm.mod <- lm(therm.diff ~ pslave1860, data = ns.whites, weights = weight)
+therm.mod.rse <- robust.se(therm.mod, clvar = "fips")
+
+therm.mod.fe <- lm(therm.diff ~ pslave1860 + state.abb*as.factor(year), data = ns.whites, weights = weight)
+therm.mod.fe.rse <- robust.se(therm.mod.fe, clvar = "fips")
+
+therm.1860 <- lm(update(base1860.form, therm.diff ~ . + state.abb*as.factor(year)), data = ns.whites, weights = weight)
+therm.1860.rse <- robust.se(therm.1860, clvar = "fips")
+
+# This stargazer code replicates Table 1, although not perfectly.
+# The checkmarks are missing (even though they made a function
+# to create them) and the table just looks nasty. Not a fan.
+
+tab1 <- stargazer(cnty.res, cnty.res.full, cnty.aff.full, cnty.resent.full,
+                  keep = "pslave1860", style = "apsr", omit.stat = c("adj.rsq","ll", "F", "ser"),
+                  covariate.labels = c("Prop. Slave, 1860"), dep.var.labels = c("Prop Democrat", "Affirm. Action", "Racial Resentment"), column.sep.width = "0pt", float = FALSE, header = FALSE, add.lines = list(rep("", 4), ch.row("State Fixed Effects", c(FALSE, rep(TRUE,3))), ch.row("1860 Covariates", c(FALSE, rep(TRUE,3))), rep("", 4)), multicolumn = TRUE, type = 'html')
+tab1[4] <- "\\\\[-1.8ex] & \\multicolumn{2}{c}{Prop. Democrat} & Affirm. Action & Racial Resentment \\\\ "
+tab1 <- gsub("\\{\\*\\}", "\\{\\\\dagger\\}", tab1)
+tab1 <- gsub("\\{\\*\\*\\}", "\\{\\*\\}", tab1)
+tab1 <- gsub("\\{\\*\\*\\*\\}", "\\{\\*\\*\\}", tab1)
+tab1 <- tab1[-(length(tab1)-1)]
+cat(paste(tab1, collapse = "\n"), "\n")
+tab1.alt <- stargazer(cnty.res, cnty.res.full, cnty.aff.full, cnty.resent.full, therm.1860,
+                      se = list(NULL, NULL, NULL, NULL, therm.1860.rse[,2]),
+                  keep = "pslave1860", style = "apsr", omit.stat = c("adj.rsq","ll", "F", "ser"),
+                  covariate.labels = c("Prop. Slave, 1860"), dep.var.labels = c("Prop Democrat", "Affirm. Action", "Racial Resentment"), column.sep.width = "5pt", float = FALSE, header = FALSE, add.lines = list(rep("", 4), c("Level", "County", "County", "County", "County", "Individual"), ch.row("1860 Covariates", c(FALSE, rep(TRUE,3), FALSE)), ch.row("State Fixed Effects", c(FALSE, rep(TRUE,4))), ch.row("State-Year Fixed Effects", c(rep(FALSE,4), TRUE)), ch.row("Clustered SEs", c(rep(FALSE,4), TRUE)), rep("", 4)), multicolumn = TRUE)
+tab1.alt[4] <- "\\\\[-1.8ex] & \\multicolumn{2}{c}{Proportion} & Support for & Racial  & White-Black  \\\\ "
+tab1.alt <- append(tab1.alt, " & \\multicolumn{2}{c}{Democrat} & Affirm. Action &  Resentment & Therm. Diff  \\\\ ", after = 4)
+tab1.alt <- gsub("\\{\\*\\}", "\\{\\\\dagger\\}", tab1.alt)
+tab1.alt <- gsub("\\{\\*\\*\\}", "\\{\\*\\}", tab1.alt)
+tab1.alt <- gsub("\\{\\*\\*\\*\\}", "\\{\\*\\*\\}", tab1.alt)
+tab1.alt <- tab1.alt[-(length(tab1.alt)-1)]
+cat(paste(tab1.alt, collapse = "\n"), "\n")
+##cat(paste(tab1.alt, collapse = "\n"), "\n", file = "../tables/main-results.tex")
+
+
+
+
+
+## Instrumental Variables
+cnty.iv <- ivreg(update(base.iv.form, dem ~ .), data = south.counties, weights = sample.size)
+
+cnty.aff.iv <- ivreg(update(base.iv.form, affirm  ~ .), data = south.counties, weights = sample.size)
+
+cnty.resent.iv <- ivreg(update(base.iv.form, resent  ~ .), data = south.counties, weights = sample.size.res)
+
+therm.cty.iv <- ivreg(update(base.iv.form, therm.diff ~ .), data = nes.counties, weights = sample.size.td, subset = abs.sample == 1)
+
+cnty.res.first <- lm(base.first.form, data = south.counties)
+
+
+iv.tab <- stargazer(cnty.res.first, cnty.iv, cnty.aff.iv, cnty.resent.iv,
+          keep = c("cotton", "pslave1860"), style = "apsr", omit.stat = c("ll", "rsq", "adj.rsq", "ser"),
+                    covariate.labels = c("Cotton Suitability", "Prop. Slave, 1860"), dep.var.labels = c("Prop Slave", "Prop Democrat", "Affirm. Action", "Racial Resentment"), column.sep.width = "0pt", float = FALSE, header = FALSE, add.lines = list(rep("", 5), ch.row("State Fixed Effects", rep(TRUE,4)), ch.row("Geographic Controls", rep(TRUE,4)), c("Model", rep("2SLS", 4)), c("", "First Stage", rep("Second Stage", 3)), rep("", 5)), multicolumn = TRUE, model.names = FALSE)
+iv.tab[4] <- "\\\\[-1.8ex] & Prop. Slave & Prop. Democrat & Affirm. Action & Racial Resentment \\\\ "
+iv.tab <- gsub("\\{\\*\\}", "\\{\\\\dagger\\}", iv.tab)
+iv.tab <- gsub("\\{\\*\\*\\}", "\\{\\*\\}", iv.tab)
+iv.tab <- gsub("\\{\\*\\*\\*\\}", "\\{\\*\\*\\}", iv.tab)
+iv.tab <- iv.tab[-(length(iv.tab)-1)]
+cat(paste(iv.tab, collapse = "\n"), "\n")
+
+iv.tab.alt <- stargazer(cnty.res.first, cnty.iv, cnty.aff.iv, cnty.resent.iv, therm.cty.iv,
+          keep = c("cotton", "pslave1860"), style = "apsr", omit.stat = c("ll", "rsq", "adj.rsq", "ser"),
+                    covariate.labels = c("Cotton Suitability", "Prop. Slave, 1860"), dep.var.labels = c("Prop Slave", "Prop Democrat", "Affirm. Action", "Racial Resentment", "BW"), column.sep.width = "0pt", float = FALSE, header = FALSE, add.lines = list(rep("", 5), ch.row("State Fixed Effects", rep(TRUE,5)), ch.row("Geographic Controls", rep(TRUE,5)), c("Model", rep("2SLS", 5)), c("", "First Stage", rep("Second Stage", 4)), rep("", 5)), multicolumn = FALSE, model.names = FALSE)
+iv.tab.alt[4] <- "\\\\[-1.8ex] & Proportion & Proportion & Support for & Racial  & White-Black  \\\\ "
+iv.tab.alt <- append(iv.tab.alt, " & Slave, 1860 & Democrat & Affirm. Action &  Resentment & Therm. Diff  \\\\ ", after = 4)
+iv.tab.alt <- gsub("\\{\\*\\}", "\\{\\\\dagger\\}", iv.tab.alt)
+iv.tab.alt <- gsub("\\{\\*\\*\\}", "\\{\\*\\}", iv.tab.alt)
+iv.tab.alt <- gsub("\\{\\*\\*\\*\\}", "\\{\\*\\*\\}", iv.tab.alt)
+iv.tab.alt <- iv.tab.alt[-(length(iv.tab.alt)-1)]
+cat(paste(iv.tab.alt, collapse = "\n"), "\n")
+##cat(paste(iv.tab.alt, collapse = "\n"), "\n", file = "../tables/iv-table.tex")
+
+### Reduced form check in the north
+
+
+cnty.dem.rform <- lm(update(rform.form, dem ~ .), data = south.counties, weights = sample.size)
+
+cnty.dem.ns.rform <- lm(update(rform.form, dem ~ .), data = wh.counties, weights = sample.size, subset = !(state.abb %in% st.list) & !(state.abb %in% c("MD", "DE","KY", "MO", "WV")))
+
+cnty.aff.rform <- lm(update(rform.form, affirm ~ .), data = south.counties, weights = sample.size)
+
+cnty.aff.ns.rform <- lm(update(rform.form, affirm ~ .), data = wh.counties, weights = sample.size, subset = !(state.abb %in% st.list) & !(state.abb %in% c("MD", "DE","KY", "MO", "WV")))
+
+cnty.resent.rform <- lm(update(rform.form, resent ~ .), data = south.counties, weights = sample.size.res)
+
+cnty.resent.ns.rform <- lm(update(rform.form, resent ~ .), data = wh.counties, weights = sample.size.res, subset = !(state.abb %in% st.list) & !(state.abb %in% c("MD", "DE","KY","MO", "WV")))
+
+cnty.therm.rform <- lm(update(rform.form, therm.diff ~ .), data = nes.counties, weights = sample.size.td, subset = abs.sample == 1)
+
+cnty.therm.ns.rform <- lm(update(rform.form, therm.diff ~ .), data = nes.counties, weights = sample.size.td, subset = abs.sample == 0 &  !(state.abb %in% c("MD", "DE","KY","MO", "WV")))
+
+rform.tab <- stargazer(cnty.dem.rform, cnty.dem.ns.rform, cnty.aff.rform, cnty.aff.ns.rform, cnty.resent.rform, cnty.resent.ns.rform,
+          keep = "cotton", style = "apsr", omit.stat = c("ll", "adj.rsq", "F", "ser"),
+          covariate.labels = c("FAO Cotton Suitability"), dep.var.labels = c("Prop Democrat", "Affirm. Action", "Racial Resentment"),
+          title = "Reduced form of the instrumental variables estimates for the South (columns 1, 3, and 5) and the North (columns 2, 4, and 6).", label = "t:falsification", column.sep.width = "0pt", float = FALSE, header = FALSE, add.lines = list(rep("", 7), ch.row("State Fixed Effects", rep(TRUE,6)), ch.row("Geographic Controls", rep(TRUE,6)), rep("", 7)), multicolumn = TRUE)
+rform.tab[4] <- "\\\\[-1.8ex] &  \\multicolumn{2}{c}{Prop. Democrat} & \\multicolumn{2}{c}{Affirm. Action} & \\multicolumn{2}{c}{Racial Resentment} \\\\ "
+rform.tab <- append(rform.tab, "\\\\[-1.8ex] & South & Non-South & South & Non-South & South & Non-South \\\\ ", after = 5)
+rform.tab <- gsub("\\{\\*\\}", "\\{\\\\dagger\\}", rform.tab)
+rform.tab <- gsub("\\{\\*\\*\\}", "\\{\\*\\}", rform.tab)
+rform.tab <- gsub("\\{\\*\\*\\*\\}", "\\{\\*\\*\\}", rform.tab)
+rform.tab <- rform.tab[-(length(rform.tab)-1)]
+cat(paste(rform.tab, collapse = "\n"), "\n")
+##cat(paste(rform.tab, collapse = "\n"), "\n", file = "../tables/reduced-form.tex")
+
+
+## NES Results County
+therm.cty.mod <- lm(therm.diff ~ pslave1860, data = nes.counties, weights = sample.size.td, subset = abs.sample == 1)
+
+therm.cty.mod.fe <- lm(therm.diff ~ pslave1860 + state.abb, data = nes.counties, weights = sample.size.td, subset = abs.sample == 1)
+
+therm.cty.1860 <- lm(update(base1860.form, therm.diff ~ .), data = nes.counties, weights = sample.size.td, subset = abs.sample == 1)
+
+therm.cty.iv <- ivreg(update(base.iv.form, therm.diff ~ .), data = nes.counties, weights = sample.size.td, subset = abs.sample == 1)
+
+
+therm.ind <- lm(update(base1860.form, I(wtherm-btherm) ~ .  + as.factor(year)*state.abb + female + age + I(age^2) + inc.mid + as.factor(educ) + religion), data = ns.whites, weights = weight)
+therm.ind.rse <- robust.se(therm.ind, clvar = "fips")
+
+## LA, NC, AR need to be dropped due to lack of state-year variation
+## results the same with separate state and year fixed effects
+therm.iv <- ivreg(update(base.iv.form, I(wtherm-btherm) ~ . + as.factor(year)*state.abb | . + as.factor(year)*state.abb), data = ns.whites, weights = weight, subset = !(state.abb %in% c("LA", "NC","AR", "WV")))
+therm.iv.rse <- robust.se(therm.iv, clvar = "fips")
+
+therm.iv.first <- lm(update(base.first.form, . ~ . + as.factor(year)*state.abb), data = ns.whites, weights = weight, subset = !(state.abb %in% c("LA", "NC","AR", "WV")))
+
+btherm.1860 <- lm(update(base1860.form, btherm ~ . + as.factor(year)*state.abb), data = ns.whites, weights = weight)
+btherm.1860.rse <- robust.se(btherm.1860, clvar = "fips")
+
+## LA, NC, AR need to be dropped due to lack of state-year variation
+## results the same with separate state and year fixed effects
+btherm.iv <- ivreg(update(base.iv.form, btherm ~ . + as.factor(year)*state.abb | . + as.factor(year)*state.abb), data = ns.whites, weights = weight, subset = !(state.abb %in% c("LA", "NC","AR", "WV")))
+btherm.iv.rse <- robust.se(btherm.iv, clvar = "fips")
+
+wtherm.1860 <- lm(update(base1860.form, wtherm ~ . + as.factor(year)*state.abb), data = ns.whites, weights = weight)
+wtherm.1860.rse <- robust.se(wtherm.1860, clvar = "fips")
+
+## LA, NC, AR need to be dropped due to lack of state-year variation
+## results the same with separate state and year fixed effects
+wtherm.iv <- ivreg(update(base.iv.form, wtherm ~ . + as.factor(year)*state.abb | . + as.factor(year)*state.abb), data = ns.whites, weights = weight, subset = !(state.abb %in% c("LA", "NC","AR")))
+wtherm.iv.rse <- robust.se(wtherm.iv, clvar = "fips")
+
+
+therm.tab <- stargazer(therm.mod, therm.mod.fe, therm.1860, therm.iv,
+          keep = "pslave1860", style = "apsr", omit.stat = c("ll", "adj.rsq", "F", "ser"),
+          covariate.labels = c("Prop. Slave, 1860"), dep.var.labels = c("White Thermometer - Black Thermometer (-100 to 100)"), se = list(therm.mod.rse[,2], therm.mod.fe.rse[,2], therm.1860.rse[,2], therm.iv.rse[,2]), column.sep.width = "0pt", float = FALSE, header = FALSE, add.lines = list(rep("", 5), ch.row("Clustered SEs", rep(TRUE,4)), ch.row("State-Year Fixed Effects", c(FALSE, rep(TRUE,3))), ch.row("Geographic Controls", c(rep(FALSE, 2), rep(TRUE,2))), ch.row("1860 Covariates", c(FALSE, FALSE, TRUE, FALSE)), rep("", 7)), multicolumn = TRUE)
+therm.tab[4] <- "\\\\[-1.8ex] &  \\multicolumn{4}{c}{White Thermometer - Black Thermometer (-100 to 100)} \\\\ "
+therm.tab[5] <- "\\\\[-1.8ex] &  \\multicolumn{3}{c}{OLS} & IV \\\\ "
+therm.tab <- therm.tab[-6]
+therm.tab <- gsub("\\{\\*\\}", "\\{\\\\dagger\\}", therm.tab)
+therm.tab <- gsub("\\{\\*\\*\\}", "\\{\\*\\}", therm.tab)
+therm.tab <- gsub("\\{\\*\\*\\*\\}", "\\{\\*\\*\\}", therm.tab)
+therm.tab <- therm.tab[-(length(therm.tab)-1)]
+therm.tab <- append(therm.tab, paste("First-stage t-statistic & & & & ", round(summary(therm.iv.first)$coef[2,3], 2), "$^{**}$ \\\\", sep = ""), length(therm.tab)-2)
+cat(paste(therm.tab, collapse = "\n"), "\n")
+##cat(paste(therm.tab, collapse = "\n"), "\n", file = "../tables/therm-tab.tex")
+
+septherm.tab <- stargazer(btherm.1860, btherm.iv, wtherm.1860, wtherm.iv,
+          keep = "pslave1860", style = "apsr", omit.stat = c("ll", "adj.rsq", "F", "ser"),
+          covariate.labels = c("Prop. Slave, 1860"), dep.var.labels = c("Black Therm. Scores", "White Therm. Scores"), se = list(btherm.1860.rse[,2], btherm.iv.rse[,2], wtherm.1860.rse[,2], wtherm.iv.rse[,2]), column.sep.width = "0pt", float = FALSE, header = FALSE, add.lines = list(rep("", 5), ch.row("Clustered SEs", rep(TRUE,4)), ch.row("State-Year Fixed Effects", rep(TRUE,4)), ch.row("Geographic Controls", rep(TRUE,4)), ch.row("1860 Covariates", c(TRUE, FALSE, TRUE, FALSE)), rep("", 7)), multicolumn = TRUE)
+septherm.tab[4] <- "\\\\[-1.8ex] &  \\multicolumn{2}{c}{Black Therm. Scores} &  \\multicolumn{2}{c}{White Therm. Scores} \\\\ "
+septherm.tab[5] <- "\\\\[-1.8ex] &  OLS & IV &  OLS & IV \\\\ "
+septherm.tab <- septherm.tab[-6]
+septherm.tab <- gsub("\\{\\*\\}", "\\{\\\\dagger\\}", septherm.tab)
+septherm.tab <- gsub("\\{\\*\\*\\}", "\\{\\*\\}", septherm.tab)
+septherm.tab <- gsub("\\{\\*\\*\\*\\}", "\\{\\*\\*\\}", septherm.tab)
+septherm.tab <- septherm.tab[-(length(septherm.tab)-1)]
+cat(paste(septherm.tab, collapse = "\n"), "\n")
+##cat(paste(septherm.tab, collapse = "\n"), "\n", file = "../tables/therm-separate.tex")
+
+
+ctytherm.tab <- stargazer(therm.cty.mod, therm.cty.mod.fe, therm.cty.1860, therm.cty.iv,
+          keep = "pslave1860", style = "apsr", omit.stat = c("ll", "adj.rsq", "F", "ser"),
+          covariate.labels = c("Prop. Slave, 1860"), dep.var.labels = c("White Thermometer - Black Thermometer (-100 to 100)"), column.sep.width = "0pt", float = FALSE, header = FALSE, add.lines = list(rep("", 5), ch.row("Clustered SEs", rep(TRUE,4)), ch.row("State-Year Fixed Effects", rep(TRUE,4)), ch.row("Geographic Controls", rep(TRUE,4)), ch.row("1860 Covariates", c(TRUE, FALSE, TRUE, FALSE)), rep("", 7)), multicolumn = TRUE)
+ctytherm.tab[4] <- "\\\\[-1.8ex] &  \\multicolumn{4}{c}{White Thermometer - Black Thermometer (-100 to 100)} \\\\ "
+ctytherm.tab[5] <- "\\\\[-1.8ex] &  \\multicolumn{3}{c}{OLS} & IV \\\\ "
+ctytherm.tab <- ctytherm.tab[-6]
+ctytherm.tab <- gsub("\\{\\*\\}", "\\{\\\\dagger\\}", ctytherm.tab)
+ctytherm.tab <- gsub("\\{\\*\\*\\}", "\\{\\*\\}", ctytherm.tab)
+ctytherm.tab <- gsub("\\{\\*\\*\\*\\}", "\\{\\*\\*\\}", ctytherm.tab)
+ctytherm.tab <- ctytherm.tab[-(length(ctytherm.tab)-1)]
+cat(paste(ctytherm.tab, collapse = "\n"), "\n")
+##cat(paste(ctytherm.tab, collapse = "\n"), "\n", file = "../tables/therm-county.tex")
+
+## Neighbor matching
+cnty.res.neighbor <- lm(update(base1860.form, dem ~ .), data = south.counties, weights = sample.size, subset = nmatch.diff.20 == 1)
+
+cnty.aff.neighbor <- lm(update(base1860.form, affirm ~ .), data = south.counties, weights = sample.size, subset = nmatch.diff.20 == 1)
+
+cnty.resent.neighbor <- lm(update(base1860.form, resent ~ .), data = south.counties, weights = sample.size.res, subset = nmatch.diff.20 == 1)
+
+## Matching (Non-slave south versus north)
+## Note that there will be some slight deviation from the results in
+## the paper due to the random nature of k2k matching in this context
+mdata <- wh.counties[which(!(wh.counties$state.abb %in% st.list) | wh.counties$pslave < 0.05),]
+mdata <- mdata[which(!(mdata$state.abb %in% c("MD", "DE"))), ]
+mvars <- c("dem", "affirm", "resent","south", "fvalpc1860", "fbprop1860", "totpop1860", "longitude", "latitude", "coarea00")
+mdata$south <- 1 * (mdata$state.abb %in% st.list)
+mout <- cem("south", data = mdata[,mvars], drop = c("dem", "affirm", "resent"), k2k = TRUE)
+
+unique(mdata$state.abb[mout$w > 0 & mdata$south == TRUE])
+unique(mdata$state.abb[mout$w > 0 & mdata$south == FALSE])
+
+match.dem <- lm(update(base1860.form, dem ~ south + . - pslave1860 - state.abb), data = mdata, weights = sample.size, subset = mout$w > 0)
+
+match.aff <- lm(update(base1860.form, affirm ~ south + . - pslave1860 - state.abb), data = mdata, weights = sample.size, subset = mout$w > 0)
+
+match.resent <- lm(update(base1860.form, resent ~ south + . - pslave1860 - state.abb), data = mdata, weights = sample.size.res, subset = mout$w > 0)
 ```
 
