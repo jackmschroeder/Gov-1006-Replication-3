@@ -4,3 +4,5 @@
 .Ruserdata
 *.Rproj
 *DS_Store
+*abs-jop-cces-ind.csv
+*abs-jop-nes-ind.csv
