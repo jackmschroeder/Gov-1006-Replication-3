@@ -1,0 +1,181 @@
+---
+title: 'Replication #3'
+author: "Jack Schroeder"
+date: "3/5/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE, results = 'asis'}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Tables 1 and 3 and All Figures
+
+# I begin by loading Acharya et al's libraries.
+# Most of these are already installed, but some (like maps and cem)
+# need to be installed before running the code. Cem requires XQuartz,
+# which I did not have installed.
+
+library(foreign)
+library(plyr)
+library(reshape)
+library(sandwich)
+library(maps)
+library(stargazer)
+library(AER)
+library(Formula)
+library(lme4)
+library(cem)
+library(latticeExtra)
+library(stringr)
+
+# This source code contains functions and colors (like tangy blue!).
+
+source("Dataverse_Files/panel-utils.R")
+
+# The fips file contains state FIPS (Federal Information Processing Standard) data.
+
+data(state.fips)
+
+# From there the authors do some work manipulating the data and saving it as fips.state.
+
+state.fips <- unique(state.fips[,c("fips","abb")])
+state.fips$abb <- as.character(state.fips$abb)
+
+# It appears there was some trouble with Alaska and Hawaii, which the authors fix.
+
+state.fips <- rbind(state.fips, c(2, "AK"))
+state.fips <- rbind(state.fips, c(15, "HI"))
+rownames(state.fips) <- state.fips$abb
+fips.state <- state.fips
+rownames(fips.state) <- fips.state$fips
+
+# They also load in county FIPS data.
+
+data(county.fips)
+
+# Then they create three new colors. A real shame the study was in black and white.
+
+dodgerblue.30 <- rgb(30, 144, 255, 76.5, max =255)
+indianred.30 <- rgb(205, 92, 92, 76.5, max =255)
+indianred.75 <- rgb(205, 92, 92, 191, max =255)
+
+# They make a function to compute clustered-standard errors. It comes from Mahmood
+# Arai and requires the libraries 'sandwich' and 'lmtest'. I would like to hear more
+# about clustered standard errors in class if possible, since they are a bit confusing.
+# From there, I am not really sure what the function is doing.
+
+# Also the fact that the link they give to explain their method doesn't work isn't all 
+# that helpful to me.
+
+robust.se <- function(fm, clvar){
+  library(sandwich);library(lmtest);
+  x <- eval(fm$call$data, envir = parent.frame())
+  if ("polr" %in% class(fm)) {
+    require(MASS)
+    cluster <- x[rownames(predict(fm, type = "probs")), clvar]
+  } else {
+    cluster <- x[names(predict(fm)), clvar]
+  }
+  M <- length(unique(cluster))
+  N <- length(cluster)
+  K <- dim(vcov(fm))[1]
+  dfc <- (M/(M-1))*((N-1)/(N-K))
+  uj  <- apply(estfun(fm),2, function(x) tapply(x, cluster, sum));
+  vcovCL <- dfc*sandwich(fm, meat=crossprod(uj)/N)
+  coeftest(fm, vcovCL)
+}
+
+# This function will help put checkmarks in the tables. It is fairly simple latek 
+# formatting.
+
+ch.row <- function(name, yesno) {
+    c(name, ifelse(yesno, "$\\checkmark$", ""))
+}
+
+# They then read in three csv files (and make sure strings are not read in as factors).
+# Preceptor would change these to read_csv. I just don't want to mess up the rest of 
+# their study before making a semantic change.
+
+# The first contains county data. Lots of it is location or race-based. Some interesting
+# stats in here, like `pdem1856`.
+
+countydata <- read.csv("Dataverse_Files/abs-jop-countydata.csv", stringsAsFactors = FALSE)
+
+# wh.counties is the data from individual respondents from the ANES survey in white
+# counties. Or is it data from white respondents? Unclear.
+
+wh.counties <- read.csv("Dataverse_Files/abs-jop-cces-white-countydata.csv", stringsAsFactors = FALSE)
+
+# Then they read in the total respondents from the CCES (Cooperative Congressional
+# Election Study).
+
+cces.comb <- read.csv("Dataverse_Files/abs-jop-cces-ind.csv", stringsAsFactors = FALSE)
+
+# Then they read in the states they're looking at: states in the Confederacy plus MO
+# and KY (who, contrary to popular belief, remained in the Union). They comb their
+# datasets for these states. They multiply by 1 probably to return only 1 and 0 values
+# (and not T/F).
+
+st.list <- c("AL", "AR", "GA", "FL", "KY", "LA", "MS", "MO", "NC", "SC", "TN", "TX", "VA","WV")
+cces.comb$abs.sample <- 1 * (cces.comb$state.abb %in% st.list)
+wh.counties$abs.sample <- 1 * (wh.counties$state.abb %in% st.list)
+countydata$abs.sample <- 1 * (countydata$state.abb %in% st.list)
+
+# They also mess with the tractor growth column for reasons unknown.
+
+wh.counties$tractor.growth <- (wh.counties$tractors40 - wh.counties$tractors30)
+
+# They relevel the income category in cces.comb, along with creating some datasets
+# based off race.
+
+cces.comb$inc.cat <- factor(cces.comb$inc.cat, levels = c("<20k", "20-50k", "50-100k", "100-150k", "150k+"))
+whites <- cces.comb[which(cces.comb$white == 1),]
+blacks <- cces.comb[which(cces.comb$black == 1),]
+latinos <- cces.comb[which(cces.comb$latino == 1),]
+others <- cces.comb[which(cces.comb$white != 1 & cces.comb$black != 1 & cces.comb$latino != 1),]
+
+# Then they grab Southerner-specific data.
+
+southerners <- subset(cces.comb, abs.sample == 1)
+s.whites <- subset(whites, abs.sample == 1)
+s.blacks <- subset(blacks, abs.sample == 1)
+s.latinos <- subset(latinos, abs.sample == 1)
+
+# They make sure to add state and county FIPS data.
+
+s.whites$state.abb <- factor(s.whites$state.abb)
+s.blacks$state.abb <- factor(s.blacks$state.abb)
+s.latinos$state.abb <- factor(s.latinos$state.abb)
+south.counties <- subset(wh.counties, abs.sample == 1)
+south.counties$state.abb <- factor(south.counties$state.abb)
+south.counties <- south.counties[order(as.numeric(south.counties$fips)),]
+
+# They read in NES data on white counties with read.csv.
+# This should probably be ANES but that's beside the point.
+
+nes.counties <- read.csv("Dataverse_Files/abs-jop-nes-white-countydata.csv", stringsAsFactors = FALSE)
+
+# They do a similar abs.sample as above, multiplying by 1 to return binary values.
+
+nes.counties$abs.sample <- 1 * (nes.counties$state.abb %in% st.list)
+
+# They read in another csv to use for combing the NES data, again making an abs.sample
+# column that's multiplied by 1.
+
+nes.comb <- read.csv("Dataverse_Files/abs-jop-nes-ind.csv", stringsAsFactors = FALSE)
+nes.comb$abs.sample <- 1 * (nes.comb$state.abb %in% st.list)
+
+# They create nes.whites and nes.blacks based on racial data in nes.comb.
+
+nes.whites <- nes.comb[which(nes.comb$white == 1),]
+nes.blacks <- nes.comb[which(nes.comb$black == 1),]
+
+# This chunk subsets nes.whites based on race and sample. They add abbreviations.
+ns.whites <- subset(nes.whites, abs.sample == 1)
+ns.blacks <- subset(nes.blacks, abs.sample == 1)
+ns.whites$state.abb <- factor(ns.whites$state.abb)
+ns.blacks$state.abb <- factor(ns.blacks$state.abb)
+
+
+```
+
